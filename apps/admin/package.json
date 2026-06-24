@@ -17,7 +17,5 @@
     "@gostop/engine": "workspace:*",
     "@gostop/shared": "workspace:*"
   },
-  "devDependencies": {
-    "vitest": "^2.1.8"
-  }
+  "devDependencies": {}
 }
