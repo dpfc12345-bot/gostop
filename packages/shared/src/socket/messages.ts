@@ -123,7 +123,8 @@ export interface StateDiffMsg {
 export interface DecisionRequestMsg {
   gameId: string;
   seq: number;
-  decision: PendingDecisionView;
+  /** Present for AWAITING_DECISION; omitted for optional PLAYING declarations (shake/bomb). */
+  decision?: PendingDecisionView;
   /** Exactly the actions the server will accept right now. */
   legalActions: GameAction[];
 }

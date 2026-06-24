@@ -93,6 +93,37 @@ describe('RoomActor — solo vs AI', () => {
     }
   });
 
+  it('starts a new game when rejoining a finished solo room', async () => {
+    const { manager } = createTestRoomManager();
+    const room = manager.getOrCreate('solo-rematch');
+
+    const first = await room.join({
+      userId: 'solo-human-rematch',
+      socketId: 'sock-solo-rematch-1',
+      nickname: '나',
+      solo: true,
+    });
+    expect(first.status).toBe('OK');
+    const oldGameId = room.gameId;
+    expect(oldGameId).toBeTruthy();
+
+    room.status = 'FINISHED';
+    if (room.state) {
+      room.state = { ...room.state, phase: 'FINISHED' };
+    }
+
+    const second = await room.join({
+      userId: 'solo-human-rematch',
+      socketId: 'sock-solo-rematch-2',
+      nickname: '나',
+      solo: true,
+    });
+    expect(second.status).toBe('OK');
+    expect(room.gameId).not.toBe(oldGameId);
+    expect(room.state?.phase).not.toBe('FINISHED');
+    expect(second.sync).toBeDefined();
+  });
+
   it('starts from solo- room id without solo flag', async () => {
     const { manager } = createTestRoomManager();
     const room = manager.getOrCreate('solo-room-id-test');

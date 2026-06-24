@@ -120,6 +120,9 @@ export class RoomActor {
       this.ensureAiOpponent();
       const human = [...this.members.values()].find((m) => !m.isSpectator && !m.isAi);
       if (human) human.ready = true;
+      if (this.state?.phase === 'FINISHED') {
+        this.resetForNewGame();
+      }
     }
 
     this.emitRoomState();
@@ -127,6 +130,7 @@ export class RoomActor {
     const finalSync = this.state ? this.buildSyncFor(params.userId) : undefined;
     if (finalSync && this.state) {
       this.scheduleAiTurn();
+      this.maybeEmitPlayingDeclarations(this.state, this.eventSeq);
     }
     return {
       status: 'OK',
@@ -229,8 +233,9 @@ export class RoomActor {
 
       await this.deps.actionDedup.record(this.gameId, envelope.actionId, toSeq);
       await this.maybeSnapshot();
-      this.broadcastDiffs(fromSeq, toSeq, events);
-      this.maybeEmitDecision(nextState, toSeq);
+    this.broadcastDiffs(fromSeq, toSeq, events);
+    this.maybeEmitDecision(nextState, toSeq);
+    this.maybeEmitPlayingDeclarations(nextState, toSeq);
       if (nextState.phase === 'FINISHED') {
         this.status = 'FINISHED';
         this.broadcastGameEnded(events);
@@ -323,6 +328,7 @@ export class RoomActor {
       const fromSeq = -1;
       this.broadcastDiffs(fromSeq, this.eventSeq, events);
       this.emitRoomState();
+      this.maybeEmitPlayingDeclarations(state, this.eventSeq);
 
       if (state.phase === 'FINISHED') {
         this.status = 'FINISHED';
@@ -396,6 +402,25 @@ export class RoomActor {
       decision: view.pending ?? state.pending,
       legalActions: getLegalActions(state),
     });
+  }
+
+  /** Notify the active human seat of optional PLAYING declarations (흔들기 / 폭탄). */
+  private maybeEmitPlayingDeclarations(state: GameState, seq: number): void {
+    if (state.phase !== 'PLAYING' || state.pending) return;
+
+    const seat = state.turn;
+    for (const member of this.members.values()) {
+      if (!member.connected || member.isSpectator || member.seat !== seat || member.isAi) continue;
+
+      const legal = getLegalActions(state).filter(
+        (a) => a.type === 'DECLARE_SHAKE' || a.type === 'PLAY_BOMB',
+      );
+      this.deps.broadcaster.emitToSocket(member.socketId, 'game:decision', {
+        gameId: state.gameId,
+        seq,
+        legalActions: legal,
+      });
+    }
   }
 
   private broadcastGameEnded(events: readonly GameEvent[]): void {
@@ -484,6 +509,27 @@ export class RoomActor {
       error: { code, message },
       legalActions: legal,
     };
+  }
+
+  /** Clear ended game so solo rematch / rejoin can deal a fresh hand. */
+  private resetForNewGame(): void {
+    if (this.aiTimer) {
+      clearTimeout(this.aiTimer);
+      this.aiTimer = null;
+    }
+    this.gameId = null;
+    this.state = null;
+    this.eventSeq = -1;
+    this.status = 'WAITING';
+    this.diffBatches.length = 0;
+    this.aiBusy = false;
+
+    if (this.soloMode) {
+      const human = [...this.members.values()].find((m) => !m.isSpectator && !m.isAi);
+      if (human) human.ready = true;
+      const ai = this.getAiMember();
+      if (ai) ai.ready = true;
+    }
   }
 
   private ensureAiOpponent(): void {

@@ -136,6 +136,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       view: nextView,
       eventSeq: msg.toSeq,
       stateHash: msg.stateHash ?? s.stateHash,
+      legalActions: [],
       replayFrames,
       eventLog: appendLog(s, {
         kind: 'DIFF',

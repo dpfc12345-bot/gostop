@@ -12,7 +12,23 @@ interface VictoryScreenProps {
 export function VictoryScreen({ result, mySeat }: VictoryScreenProps) {
   const navigate = useNavigate();
   const user = useGameStore((s) => s.user);
+  const roomId = useGameStore((s) => s.roomId);
+  const resetGame = useGameStore((s) => s.resetGame);
   const won = result.winner === mySeat;
+  const isSolo = roomId?.startsWith('solo-') ?? false;
+
+  function playAgain() {
+    resetGame();
+    if (isSolo) {
+      navigate(`/room/solo-${crypto.randomUUID().slice(0, 8)}`, { replace: true });
+      return;
+    }
+    if (roomId) {
+      navigate(`/room/${roomId}`, { replace: true });
+      return;
+    }
+    navigate('/lobby', { replace: true });
+  }
   const myBreakdown = result.breakdowns.find((b) => b.seat === mySeat);
   const opponentBreakdown = result.breakdowns.find((b) => b.seat !== mySeat);
 
@@ -130,7 +146,7 @@ export function VictoryScreen({ result, mySeat }: VictoryScreenProps) {
             <Button variant="outline" className="flex-1" onClick={() => navigate('/lobby')}>
               로비
             </Button>
-            <Button variant="primary" className="flex-1" onClick={() => window.location.reload()}>
+            <Button variant="primary" className="flex-1" onClick={playAgain}>
               다시하기
             </Button>
           </div>
