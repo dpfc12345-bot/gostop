@@ -4,10 +4,17 @@ import type { LockService } from './lock.service.js';
 export class InMemoryLockService implements LockService {
   private readonly held = new Set<string>();
 
-  async withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
-    if (this.held.has(key)) {
-      throw new Error(`lock busy: ${key}`);
+  async withLock<T>(key: string, fn: () => Promise<T>, timeoutMs = 10_000): Promise<T> {
+    const deadline = Date.now() + timeoutMs;
+    const retryDelayMs = 20;
+
+    while (this.held.has(key)) {
+      if (Date.now() >= deadline) {
+        throw new Error(`lock timeout: ${key}`);
+      }
+      await new Promise<void>((resolve) => setTimeout(resolve, retryDelayMs));
     }
+
     this.held.add(key);
     try {
       return await fn();
