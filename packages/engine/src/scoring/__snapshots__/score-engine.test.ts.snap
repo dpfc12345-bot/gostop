@@ -1,0 +1,145 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ScoreEngine — official-example Snapshot Test > canonical hands snapshot (full breakdown for replay explainability) 1`] = `
+{
+  "godoriHand": {
+    "appliedBak": [],
+    "base": 6,
+    "bomb": false,
+    "bombCount": 0,
+    "components": [
+      {
+        "cards": [
+          4,
+          12,
+          29,
+          16,
+          20,
+        ],
+        "code": "YEOLKKUT",
+        "label": "열끗",
+        "points": 1,
+      },
+      {
+        "cards": [
+          4,
+          12,
+          29,
+        ],
+        "code": "GODORI",
+        "label": "고도리",
+        "points": 5,
+      },
+    ],
+    "goBonus": 0,
+    "multiplier": 1,
+    "multipliers": [],
+    "mungtta": false,
+    "seat": 0,
+    "shakeCount": 0,
+    "shaking": false,
+    "showdownCount": 0,
+    "total": 6,
+  },
+  "sevenGoMultiplier": {
+    "appliedBak": [],
+    "base": 15,
+    "bomb": false,
+    "bombCount": 0,
+    "components": [
+      {
+        "cards": [
+          0,
+          8,
+          28,
+          40,
+          44,
+        ],
+        "code": "GWANG_5",
+        "label": "오광",
+        "points": 15,
+      },
+    ],
+    "goBonus": 3,
+    "multiplier": 2,
+    "multipliers": [
+      {
+        "code": "GO_MULT",
+        "factor": 2,
+        "label": "3고",
+      },
+    ],
+    "mungtta": false,
+    "seat": 0,
+    "shakeCount": 0,
+    "shaking": false,
+    "showdownCount": 0,
+    "total": 36,
+  },
+  "shakenBomb": {
+    "appliedBak": [],
+    "base": 3,
+    "bomb": true,
+    "bombCount": 1,
+    "components": [
+      {
+        "cards": [
+          0,
+          8,
+          28,
+        ],
+        "code": "GWANG_3",
+        "label": "삼광",
+        "points": 3,
+      },
+    ],
+    "goBonus": 0,
+    "multiplier": 4,
+    "multipliers": [
+      {
+        "code": "SHAKE",
+        "factor": 2,
+        "label": "흔들기",
+      },
+      {
+        "code": "BOMB",
+        "factor": 2,
+        "label": "폭탄",
+      },
+    ],
+    "mungtta": false,
+    "seat": 0,
+    "shakeCount": 1,
+    "shaking": true,
+    "showdownCount": 0,
+    "total": 12,
+  },
+  "threeBright": {
+    "appliedBak": [],
+    "base": 3,
+    "bomb": false,
+    "bombCount": 0,
+    "components": [
+      {
+        "cards": [
+          0,
+          8,
+          28,
+        ],
+        "code": "GWANG_3",
+        "label": "삼광",
+        "points": 3,
+      },
+    ],
+    "goBonus": 0,
+    "multiplier": 1,
+    "multipliers": [],
+    "mungtta": false,
+    "seat": 0,
+    "shakeCount": 0,
+    "shaking": false,
+    "showdownCount": 0,
+    "total": 3,
+  },
+}
+`;

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "composite": true,
+    "incremental": true,
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": true,
+    "forceConsistentCasingInFileNames": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+
+    "baseUrl": ".",
+    "paths": {
+      "@gostop/engine": ["packages/engine/src/index.ts"],
+      "@gostop/engine/*": ["packages/engine/src/*"],
+      "@gostop/shared": ["packages/shared/src/index.ts"],
+      "@gostop/shared/*": ["packages/shared/src/*"],
+      "@gostop/ai": ["packages/ai/src/index.ts"],
+      "@gostop/ai/*": ["packages/ai/src/*"]
+    }
+  },
+  "exclude": ["node_modules", "dist", "build", ".next", ".turbo", "coverage"]
+}

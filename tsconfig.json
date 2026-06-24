@@ -1,0 +1,10 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/engine" },
+    { "path": "packages/shared" },
+    { "path": "packages/ai" },
+    { "path": "apps/backend-api" },
+    { "path": "apps/backend-game" }
+  ]
+}

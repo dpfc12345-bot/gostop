@@ -1,0 +1,45 @@
+{
+  "name": "@gostop/backend-game",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Realtime game server: Socket.IO, game execution, room management, matchmaking.",
+  "type": "module",
+  "main": "./dist/main.js",
+  "exports": {
+    ".": {
+      "default": "./dist/main.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "default": "./dist/testing/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "start": "node dist/main.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "clean": "rimraf dist .turbo *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@gostop/ai": "workspace:*",
+    "@gostop/db": "workspace:*",
+    "@gostop/engine": "workspace:*",
+    "@gostop/shared": "workspace:*",
+    "@nestjs/common": "^11.0.7",
+    "@nestjs/core": "^11.0.7",
+    "@nestjs/platform-express": "^11.0.7",
+    "@nestjs/platform-socket.io": "^11.0.7",
+    "@nestjs/websockets": "^11.0.7",
+    "ioredis": "^5.4.2",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.8"
+  }
+}

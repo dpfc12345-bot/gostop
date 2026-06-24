@@ -1,0 +1,297 @@
+:root {
+  /* Brand */
+  --color-brand: #c41e3a;
+  --color-brand-dark: #8b1228;
+  --color-brand-glow: rgba(196, 30, 58, 0.55);
+  --color-gold: #f5c842;
+  --color-gold-bright: #ffe082;
+  --color-gold-dim: #c9a227;
+
+  /* Table — felt */
+  --color-felt: #145a42;
+  --color-felt-light: #1d7a58;
+  --color-felt-mid: #18664f;
+  --color-felt-dark: #0a3d2e;
+  --color-felt-highlight: rgba(255, 255, 255, 0.07);
+  --color-felt-border: #2a9d6a;
+
+  /* Table — wood rail */
+  --color-rail: #4a3020;
+  --color-rail-light: #6b4528;
+  --color-rail-dark: #2a1a10;
+  --color-rail-highlight: rgba(255, 220, 160, 0.12);
+
+  /* Surfaces */
+  --color-bg: #080a0e;
+  --color-bg-deep: #050608;
+  --color-surface: #12161e;
+  --color-surface-raised: #1a2030;
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-gold: rgba(245, 200, 66, 0.35);
+
+  /* Text */
+  --color-text: #f4f1ea;
+  --color-text-muted: #9ca3af;
+  --color-text-dim: #6b7280;
+
+  /* Card */
+  --color-card-face: #f3e4c8;
+  --color-card-red: #b91c1c;
+
+  /* Radius & shadow */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
+  --radius-2xl: 1.75rem;
+  --shadow-card:
+    0 1px 0 rgba(255, 255, 255, 0.08) inset,
+    0 6px 16px rgba(0, 0, 0, 0.55),
+    0 2px 4px rgba(0, 0, 0, 0.35);
+  --shadow-card-hover:
+    0 1px 0 rgba(255, 255, 255, 0.12) inset,
+    0 14px 28px rgba(0, 0, 0, 0.6),
+    0 4px 8px rgba(0, 0, 0, 0.4);
+  --shadow-card-lift: 0 20px 40px rgba(0, 0, 0, 0.65);
+  --shadow-glow-gold: 0 0 28px rgba(245, 200, 66, 0.5);
+  --shadow-glow-red: 0 0 36px rgba(196, 30, 58, 0.55);
+  --shadow-table:
+    0 24px 64px rgba(0, 0, 0, 0.75),
+    0 8px 24px rgba(0, 0, 0, 0.5);
+
+  --font-sans: 'Noto Sans KR', system-ui, sans-serif;
+  --font-display: 'Black Han Sans', 'Noto Sans KR', sans-serif;
+
+  --game-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --game-safe-top: env(safe-area-inset-top, 0px);
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.text-gold {
+  color: var(--color-gold);
+}
+
+.bg-app {
+  background:
+    radial-gradient(ellipse 100% 60% at 50% -10%, #1a2840 0%, transparent 55%),
+    radial-gradient(ellipse 80% 50% at 50% 110%, #0f1810 0%, transparent 50%),
+    var(--color-bg);
+}
+
+/* ── Game table shell ── */
+.game-viewport {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  align-items: stretch;
+  justify-content: center;
+  padding: 0.125rem;
+  padding-bottom: calc(0.125rem + var(--game-safe-bottom));
+}
+
+.game-table-outer {
+  position: relative;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.game-table-rail {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-xl);
+  padding: 0.375rem;
+  background:
+    linear-gradient(160deg, var(--color-rail-light) 0%, var(--color-rail) 35%, var(--color-rail-dark) 100%);
+  box-shadow:
+    var(--shadow-table),
+    inset 0 1px 0 var(--color-rail-highlight),
+    inset 0 -2px 8px rgba(0, 0, 0, 0.4);
+}
+
+@media (min-width: 640px) {
+  .game-table-rail {
+    padding: 0.5rem;
+    border-radius: 1.25rem;
+  }
+}
+
+.game-table-felt {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: calc(var(--radius-2xl) - 0.375rem);
+  background:
+    radial-gradient(ellipse 85% 65% at 50% 38%, var(--color-felt-light) 0%, var(--color-felt-mid) 42%, var(--color-felt-dark) 100%);
+  box-shadow:
+    inset 0 2px 24px var(--color-felt-highlight),
+    inset 0 -6px 32px rgba(0, 0, 0, 0.45),
+    inset 0 0 0 2px var(--color-felt-border);
+}
+
+.game-table-felt::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0.35;
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 3px,
+      rgba(0, 0, 0, 0.03) 3px,
+      rgba(0, 0, 0, 0.03) 4px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 3px,
+      rgba(0, 0, 0, 0.03) 3px,
+      rgba(0, 0, 0, 0.03) 4px
+    );
+}
+
+.game-table-felt::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(ellipse 70% 50% at 50% 45%, transparent 30%, rgba(0, 0, 0, 0.18) 100%);
+}
+
+/* Player zones on felt */
+.game-zone {
+  position: relative;
+  z-index: 2;
+  flex-shrink: 0;
+}
+
+.game-zone-opponent {
+  padding: 0.375rem 0.5rem 0.25rem;
+}
+
+.game-zone-field {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0.125rem 0.375rem;
+}
+
+.game-zone-player {
+  padding: 0.25rem 0.5rem calc(0.375rem + var(--game-safe-bottom));
+}
+
+@media (min-width: 640px) {
+  .game-zone-opponent { padding: 0.5rem 0.625rem 0.375rem; }
+  .game-zone-player { padding: 0.375rem 0.625rem 0.5rem; }
+}
+
+/* HUD pill */
+.hud-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border-radius: 9999px;
+  padding: 0.25rem 0.625rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.45);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.hud-pill-gold {
+  border-color: var(--color-border-gold);
+  background: rgba(245, 200, 66, 0.15);
+  color: var(--color-gold-bright);
+  box-shadow: 0 0 16px rgba(245, 200, 66, 0.2);
+}
+
+.hud-pill-turn {
+  border-color: rgba(52, 211, 153, 0.4);
+  background: rgba(16, 185, 129, 0.2);
+  color: #6ee7b7;
+  animation: turn-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes turn-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.3); }
+  50% { box-shadow: 0 0 12px 2px rgba(52, 211, 153, 0.35); }
+}
+
+/* Captured pile sections */
+.pile-section {
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(4px);
+  padding: 0.25rem 0.375rem;
+}
+
+.pile-section-bright { border-color: rgba(245, 200, 66, 0.25); }
+.pile-section-animal { border-color: rgba(251, 146, 60, 0.25); }
+.pile-section-ribbon { border-color: rgba(244, 114, 182, 0.25); }
+.pile-section-junk { border-color: rgba(156, 163, 175, 0.2); }
+
+/* Glass panels (shell) */
+.glass-panel {
+  background: rgba(14, 18, 26, 0.88);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.glass-panel-subtle {
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-lg);
+}
+
+/* Buttons */
+.btn-primary {
+  @apply rounded-xl px-6 py-3 font-semibold transition-all duration-200;
+  background: linear-gradient(180deg, var(--color-brand) 0%, var(--color-brand-dark) 100%);
+  box-shadow: 0 4px 14px rgba(196, 30, 58, 0.4);
+}
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-gold {
+  @apply rounded-xl px-6 py-3 font-bold transition-all duration-200;
+  background: linear-gradient(180deg, #ffd54f 0%, var(--color-gold-dim) 100%);
+  color: #3d2e00;
+  box-shadow: var(--shadow-glow-gold);
+}
+
+.btn-stop {
+  @apply rounded-xl px-6 py-3 font-bold transition-all duration-200;
+  background: linear-gradient(180deg, #34d399 0%, #059669 100%);
+  color: white;
+  box-shadow: 0 4px 14px rgba(5, 150, 105, 0.4);
+}

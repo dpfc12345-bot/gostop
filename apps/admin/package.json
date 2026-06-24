@@ -1,0 +1,23 @@
+{
+  "name": "@gostop/admin",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Admin console (React + Vite). Operations, moderation, game replay viewer.",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "clean": "rimraf dist .turbo *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@gostop/engine": "workspace:*",
+    "@gostop/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.8"
+  }
+}

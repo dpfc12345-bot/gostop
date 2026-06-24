@@ -1,0 +1,28 @@
+{
+  "name": "@gostop/db",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Single source of truth for the PostgreSQL schema (Prisma) + generated client. Consumed by backend-api and backend-game.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./generated/prisma/index.d.ts",
+      "default": "./generated/prisma/index.js"
+    }
+  },
+  "scripts": {
+    "db:generate": "prisma generate",
+    "db:validate": "prisma validate",
+    "db:format": "prisma format",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:studio": "prisma studio",
+    "db:reset": "prisma migrate reset"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.2.1"
+  },
+  "devDependencies": {
+    "prisma": "^6.2.1"
+  }
+}

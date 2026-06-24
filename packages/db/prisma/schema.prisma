@@ -1,0 +1,583 @@
+// =============================================================================
+// 고스톱 (Go-Stop) — PostgreSQL schema (Prisma)
+//
+// Conventions applied to EVERY model:
+//   - id          : cuid string primary key
+//   - createdAt   : set on insert
+//   - updatedAt    : auto-maintained
+//   - deletedAt    : soft delete (NULL = live row). Enforced app-side via a
+//                    Prisma client extension that rewrites find/delete to filter
+//                    and set deletedAt. Immutable ledgers (WalletTransaction,
+//                    GameEvent, GameSnapshot) keep the column for uniformity but
+//                    are never soft-deleted in practice.
+//
+// Money is stored as BigInt in the smallest currency unit (no floats).
+// Append-only stores (GameEvent, WalletTransaction) are the source of truth;
+// cached aggregates (Wallet.balance, GameParticipant results) are derived.
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Enums
+// ──────────────────────────────────────────────────────────────────────────
+
+enum AuthProvider {
+  LOCAL
+  GUEST
+  GOOGLE
+  APPLE
+  KAKAO
+}
+
+enum UserRole {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  BANNED
+}
+
+enum FriendRequestStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  CANCELLED
+}
+
+enum CurrencyType {
+  GOLD // 게임 머니 (chips)
+  RUBY // 프리미엄 재화
+}
+
+enum WalletTxType {
+  SIGNUP_BONUS
+  DAILY_REWARD
+  GAME_STAKE // 게임 참가비 차감
+  GAME_WINNING // 게임 상금 획득
+  GAME_REFUND // 무효/나가리 환불
+  PURCHASE
+  ADMIN_ADJUST
+  TRANSFER
+}
+
+enum WalletTxStatus {
+  PENDING
+  COMPLETED
+  REVERSED
+}
+
+enum GameMode {
+  PMANG_NEWMATGO
+  HANGAME_GOSTOP
+  CLASSIC_GOSTOP
+  CUSTOM
+}
+
+enum GameStatus {
+  WAITING
+  IN_PROGRESS
+  FINISHED
+  ABORTED // 비정상 종료 (disconnect 등)
+  NAGARI // 무승부
+}
+
+enum ParticipantResult {
+  WIN
+  LOSE
+  DRAW
+}
+
+enum RatingSystem {
+  ELO
+  GLICKO2
+}
+
+enum SanctionType {
+  MUTE
+  SUSPEND
+  BAN
+}
+
+enum ReportStatus {
+  OPEN
+  IN_REVIEW
+  RESOLVED
+  REJECTED
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Identity & Auth
+// ──────────────────────────────────────────────────────────────────────────
+
+model User {
+  id           String       @id @default(cuid())
+  username     String       @unique
+  email        String?      @unique
+  passwordHash String? // null for guest / social-only accounts
+  provider     AuthProvider @default(LOCAL)
+  providerId   String? // external id for social logins
+  role         UserRole     @default(USER)
+  status       UserStatus   @default(ACTIVE)
+  isGuest      Boolean      @default(false)
+
+  nickname  String
+  avatarUrl String?
+
+  lastLoginAt DateTime?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  refreshTokens    RefreshToken[]
+  wallets          Wallet[]
+  walletTxns       WalletTransaction[]
+  participations   GameParticipant[]
+  ratings          Rating[]
+  ratingHistory    RatingHistory[]
+  gamesWon         Game[]              @relation("GameWinner")
+  sentRequests     FriendRequest[]     @relation("FriendRequester")
+  receivedRequests FriendRequest[]     @relation("FriendAddressee")
+  friendships      Friendship[]        @relation("FriendOwner")
+  friendOf         Friendship[]        @relation("FriendTarget")
+  chatMessages     ChatMessage[]
+  reportsMade      Report[]            @relation("Reporter")
+  reportsReceived  Report[]            @relation("ReportTarget")
+  sanctions        Sanction[]          @relation("Sanctioned")
+  sanctionsIssued  Sanction[]          @relation("SanctionIssuer")
+  auditLogs        AdminAuditLog[]     @relation("AdminActor")
+
+  @@index([provider, providerId])
+  @@index([status])
+  @@index([deletedAt])
+  @@map("users")
+}
+
+model RefreshToken {
+  id           String    @id @default(cuid())
+  userId       String
+  tokenHash    String    @unique // store only the hash
+  family       String // rotation family id (reuse detection)
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  replacedById String?   @unique
+  userAgent    String?
+  ip           String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  replacedBy RefreshToken? @relation("TokenRotation", fields: [replacedById], references: [id])
+  replaces   RefreshToken? @relation("TokenRotation")
+
+  @@index([userId])
+  @@index([family])
+  @@map("refresh_tokens")
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Social: Friends
+// ──────────────────────────────────────────────────────────────────────────
+
+model FriendRequest {
+  id          String              @id @default(cuid())
+  requesterId String
+  addresseeId String
+  status      FriendRequestStatus @default(PENDING)
+  message     String?
+  respondedAt DateTime?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  requester User @relation("FriendRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  addressee User @relation("FriendAddressee", fields: [addresseeId], references: [id], onDelete: Cascade)
+
+  @@unique([requesterId, addresseeId])
+  @@index([addresseeId, status])
+  @@map("friend_requests")
+}
+
+// Accepted friendships are stored as two directed rows (one per user) so that
+// "list my friends" is a single indexed lookup on userId.
+model Friendship {
+  id       String @id @default(cuid())
+  userId   String
+  friendId String
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  user   User @relation("FriendOwner", fields: [userId], references: [id], onDelete: Cascade)
+  friend User @relation("FriendTarget", fields: [friendId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, friendId])
+  @@index([userId])
+  @@map("friendships")
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Economy: Wallet (cache) + WalletTransaction (immutable ledger = truth)
+// ──────────────────────────────────────────────────────────────────────────
+
+model Wallet {
+  id       String       @id @default(cuid())
+  userId   String
+  currency CurrencyType
+  // CACHE only. The authoritative balance is SUM(WalletTransaction.amount).
+  // Updated transactionally alongside each ledger insert; reconcilable anytime.
+  balance  BigInt       @default(0)
+  // Optimistic-lock counter to guard against concurrent debits.
+  version  Int          @default(0)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions WalletTransaction[]
+
+  @@unique([userId, currency])
+  @@map("wallets")
+}
+
+model WalletTransaction {
+  id             String         @id @default(cuid())
+  walletId       String
+  userId         String // denormalized for fast per-user ledger queries
+  currency       CurrencyType
+  type           WalletTxType
+  status         WalletTxStatus @default(COMPLETED)
+  // Signed amount in smallest unit (debit < 0, credit > 0).
+  amount         BigInt
+  // Wallet balance immediately AFTER applying this row (running balance).
+  balanceAfter   BigInt
+  // Reference to what caused this (e.g. GAME -> gameId) for auditability.
+  refType        String?
+  refId          String?
+  // Guarantees exactly-once application of an economic effect.
+  idempotencyKey String?        @unique
+  memo           String?
+  metadata       Json?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([walletId, createdAt])
+  @@index([userId, createdAt])
+  @@index([refType, refId])
+  @@map("wallet_transactions")
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Game: Game / GameParticipant / GameEvent / GameSnapshot
+// ──────────────────────────────────────────────────────────────────────────
+
+model Game {
+  id       String     @id @default(cuid())
+  roomCode String? // ephemeral room reference (rooms live in Redis)
+  mode     GameMode
+  status   GameStatus @default(WAITING)
+
+  // Reproducibility: seed + resolved rule snapshot fully determine the deal.
+  seed       String
+  ruleConfig Json // snapshot of the engine RuleConfig used for this game
+
+  playerCount Int
+  dealerSeat  Int
+  stake       BigInt @default(0) // per-player entry stake (GOLD)
+
+  // Outcome (denormalized for fast history/ranking reads).
+  winnerUserId    String?
+  winnerSeat      Int?
+  finalScore      Int?
+  stakeMultiplier Int       @default(1)
+  eventCount      Int       @default(0) // last appended seq (denormalized cursor)
+  startedAt       DateTime?
+  endedAt         DateTime?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  winner       User?             @relation("GameWinner", fields: [winnerUserId], references: [id])
+  participants GameParticipant[]
+  events       GameEvent[]
+  snapshots    GameSnapshot[]
+  chatMessages ChatMessage[]
+  reports      Report[]
+
+  @@index([status])
+  @@index([mode, createdAt])
+  @@index([winnerUserId])
+  @@map("games")
+}
+
+model GameParticipant {
+  id      String  @id @default(cuid())
+  gameId  String
+  userId  String? // null for AI players
+  seat    Int
+  isAi    Boolean @default(false)
+  aiLevel String? // e.g. EASY / NORMAL / HARD
+
+  result  ParticipantResult?
+  score   Int                @default(0)
+  goCount Int                @default(0)
+  // Net money delta from this game (matches a WalletTransaction).
+  payout  BigInt             @default(0)
+
+  // Rating snapshot for this game (supports ELO & Glicko-2).
+  ratingSystem RatingSystem?
+  ratingBefore Float?
+  ratingAfter  Float?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  game Game  @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id])
+
+  @@unique([gameId, seat])
+  @@unique([gameId, userId])
+  @@index([userId, createdAt])
+  @@map("game_participants")
+}
+
+// Append-only Event Store. The ordered (gameId, seq) log + seed reconstructs a
+// game 100%. payload is the engine GameEvent as jsonb; type/version describe it.
+model GameEvent {
+  id      BigInt @id @default(autoincrement()) // global ordering / cursor
+  gameId  String
+  seq     Int // per-game 0-based sequence
+  type    String // engine GameEvent['type']
+  version Int    @default(1) // EVENT_SCHEMA_VERSION
+  payload Json
+
+  // createdAt is the only meaningful timestamp; updatedAt/deletedAt exist for
+  // schema uniformity but events are immutable and never soft-deleted.
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@unique([gameId, seq])
+  @@index([gameId])
+  @@index([type])
+  @@map("game_events")
+}
+
+// Periodic full-state snapshots to bound replay cost: to reach seq N, load the
+// latest snapshot with seq <= N, then apply only the events after it.
+model GameSnapshot {
+  id      String @id @default(cuid())
+  gameId  String
+  seq     Int // event seq this snapshot reflects (state AFTER applying [0..seq])
+  state   Json // full engine GameState
+  phase   String
+  version Int    @default(1)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@unique([gameId, seq])
+  @@index([gameId])
+  @@map("game_snapshots")
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Ranking: Rating (current) + RatingHistory (per-game) + Season
+//   Designed to support BOTH ELO and Glicko-2 simultaneously. ELO uses only
+//   `rating`; Glicko-2 additionally uses `rd` (deviation) and `volatility`.
+// ──────────────────────────────────────────────────────────────────────────
+
+model Season {
+  id       String   @id @default(cuid())
+  key      String   @unique // e.g. "2026-S1"
+  name     String
+  startsAt DateTime
+  endsAt   DateTime
+  isActive Boolean  @default(false)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  ratingHistory RatingHistory[]
+
+  @@index([isActive])
+  @@map("seasons")
+}
+
+model Rating {
+  id     String       @id @default(cuid())
+  userId String
+  mode   GameMode
+  system RatingSystem
+
+  rating     Float  @default(1500)
+  rd         Float? // Glicko-2 rating deviation (null for ELO)
+  volatility Float? // Glicko-2 volatility (null for ELO)
+
+  gamesPlayed Int       @default(0)
+  wins        Int       @default(0)
+  losses      Int       @default(0)
+  draws       Int       @default(0)
+  lastGameAt  DateTime?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // One current rating per (user, mode, system).
+  @@unique([userId, mode, system])
+  @@index([mode, system, rating])
+  @@map("ratings")
+}
+
+model RatingHistory {
+  id       String       @id @default(cuid())
+  userId   String
+  gameId   String?
+  seasonId String?
+  mode     GameMode
+  system   RatingSystem
+
+  ratingBefore     Float
+  ratingAfter      Float
+  rdBefore         Float?
+  rdAfter          Float?
+  volatilityBefore Float?
+  volatilityAfter  Float?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  season Season? @relation(fields: [seasonId], references: [id])
+
+  @@index([userId, mode, system, createdAt])
+  @@index([seasonId, mode, system])
+  @@map("rating_history")
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Chat (persisted for moderation / CS)
+// ──────────────────────────────────────────────────────────────────────────
+
+model ChatMessage {
+  id      String  @id @default(cuid())
+  gameId  String?
+  userId  String
+  channel String // e.g. "ROOM", "LOBBY"
+  content String
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  game Game? @relation(fields: [gameId], references: [id], onDelete: SetNull)
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([gameId, createdAt])
+  @@index([userId, createdAt])
+  @@map("chat_messages")
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Moderation & Admin
+// ──────────────────────────────────────────────────────────────────────────
+
+model Report {
+  id           String       @id @default(cuid())
+  reporterId   String
+  targetUserId String
+  gameId       String?
+  reason       String
+  status       ReportStatus @default(OPEN)
+  handledById  String?
+  handledAt    DateTime?
+  memo         String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  reporter   User  @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  targetUser User  @relation("ReportTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+  game       Game? @relation(fields: [gameId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([targetUserId])
+  @@map("reports")
+}
+
+model Sanction {
+  id         String       @id @default(cuid())
+  userId     String
+  type       SanctionType
+  reason     String
+  issuedById String?
+  startsAt   DateTime     @default(now())
+  endsAt     DateTime? // null = permanent
+  active     Boolean      @default(true)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  user     User  @relation("Sanctioned", fields: [userId], references: [id], onDelete: Cascade)
+  issuedBy User? @relation("SanctionIssuer", fields: [issuedById], references: [id])
+
+  @@index([userId, active])
+  @@map("sanctions")
+}
+
+model AdminAuditLog {
+  id         String  @id @default(cuid())
+  adminId    String
+  action     String // e.g. "USER_BAN", "WALLET_ADJUST"
+  targetType String? // e.g. "User", "Wallet"
+  targetId   String?
+  metadata   Json?
+  ip         String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  admin User @relation("AdminActor", fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId, createdAt])
+  @@index([targetType, targetId])
+  @@map("admin_audit_logs")
+}
