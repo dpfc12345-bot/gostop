@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, LayoutGroup, motion } from 'framer-motion';
 import type { PlayerView } from '@gostop/engine';
 import { cardLayoutId } from '../../lib/card-layout-id.js';
@@ -18,6 +19,17 @@ interface GameTableProps {
 }
 
 export function GameTable({ view, onPlayCard, onChooseMatch }: GameTableProps) {
+  const [playingCardId, setPlayingCardId] = useState<number | null>(null);
+  const prevViewRef = useRef(view);
+
+  // Clear "flying card" state once the server responds and view updates
+  useEffect(() => {
+    if (view !== prevViewRef.current) {
+      prevViewRef.current = view;
+      setPlayingCardId(null);
+    }
+  }, [view]);
+
   const opponent = view.opponents[0];
   const opponentMember = useGameStore.getState().room?.members.find(
     (m) => m.seat === opponent?.seat,
@@ -55,38 +67,43 @@ export function GameTable({ view, onPlayCard, onChooseMatch }: GameTableProps) {
       })
     : null;
 
+  const handlePlayCard = (cardId: number) => {
+    setPlayingCardId(cardId);
+    onPlayCard?.(cardId);
+  };
+
   return (
     <div className="game-viewport">
       <div className="game-table-outer">
         <div className="game-table-rail">
           <div className="game-table-felt">
-            <GameHUD
-              view={view}
-              myScore={myScore}
-              opponentScore={opponentScore}
-              opponentName={opponentName}
-              isMyTurn={isMyTurn}
-            />
+            {/* Single LayoutGroup so cards can animate freely between hand, field, and captured */}
+            <LayoutGroup id="hwatu-cards">
+              <GameHUD
+                view={view}
+                myScore={myScore}
+                opponentScore={opponentScore}
+                opponentName={opponentName}
+                isMyTurn={isMyTurn}
+              />
 
-            {/* ── Opponent zone ── */}
-            <section className="game-zone game-zone-opponent">
-              <OpponentHand count={opponent?.handCount ?? 0} />
-              {opponent && (
-                <CapturedStrip
-                  rulePreset={view.rulePreset}
-                  seat={opponent.seat}
-                  captured={opponent.captured}
-                  goCount={opponent.goCount}
-                  hasShaken={opponent.hasShaken}
-                  compact
-                  layoutGroupId="opp-captured"
-                />
-              )}
-            </section>
+              {/* ── Opponent zone ── */}
+              <section className="game-zone game-zone-opponent">
+                <OpponentHand count={opponent?.handCount ?? 0} />
+                {opponent && (
+                  <CapturedStrip
+                    rulePreset={view.rulePreset}
+                    seat={opponent.seat}
+                    captured={opponent.captured}
+                    goCount={opponent.goCount}
+                    hasShaken={opponent.hasShaken}
+                    compact
+                  />
+                )}
+              </section>
 
-            {/* ── Field zone ── */}
-            <section className="game-zone game-zone-field">
-              <LayoutGroup id="field">
+              {/* ── Field zone ── */}
+              <section className="game-zone game-zone-field">
                 <div className="flex w-full max-w-none items-center justify-center gap-2 sm:gap-4">
                   <DeckPile count={view.drawPileCount} />
 
@@ -118,10 +135,17 @@ export function GameTable({ view, onPlayCard, onChooseMatch }: GameTableProps) {
                                   key={id}
                                   layout
                                   layoutId={cardLayoutId(id)}
-                                  initial={{ opacity: 0, scale: 0.6, rotate: -8 }}
-                                  animate={{ opacity: 1, scale: 1, rotate: 0 }}
-                                  exit={{ opacity: 0, scale: 0.5 }}
-                                  transition={{ ...cardEnterTransition, ...cardLayoutTransition }}
+                                  /* Enters from the player side (below) so it looks
+                                     like it flew up from the hand */
+                                  initial={{ opacity: 0, scale: 0.72, y: 56, rotate: 6 }}
+                                  animate={{ opacity: 1, scale: 1, y: 0, rotate: 0 }}
+                                  exit={{ opacity: 0, scale: 0.55, y: -20 }}
+                                  transition={{
+                                    type: 'spring',
+                                    stiffness: 340,
+                                    damping: 26,
+                                    ...cardLayoutTransition,
+                                  }}
                                 >
                                   <HwatuCard
                                     id={id}
@@ -142,38 +166,38 @@ export function GameTable({ view, onPlayCard, onChooseMatch }: GameTableProps) {
                     </AnimatePresence>
                   </div>
                 </div>
-              </LayoutGroup>
 
-              {pendingMatch && (
-                <motion.p
-                  className="mt-2 text-center text-[10px] font-bold text-sky-200 sm:text-xs"
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                >
-                  {pendingMatch.month}월 — 바닥 카드를 선택하세요
-                </motion.p>
-              )}
-            </section>
+                {pendingMatch && (
+                  <motion.p
+                    className="mt-2 text-center text-[10px] font-bold text-sky-200 sm:text-xs"
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                  >
+                    {pendingMatch.month}월 — 바닥 카드를 선택하세요
+                  </motion.p>
+                )}
+              </section>
 
-            {/* ── Player zone ── */}
-            <section className="game-zone game-zone-player">
-              <CapturedStrip
-                rulePreset={view.rulePreset}
-                seat={view.self.seat}
-                captured={view.self.captured}
-                goCount={view.self.goCount}
-                hasShaken={view.self.hasShaken}
-                layoutGroupId="my-captured"
-              />
-
-              <div className="mt-1 border-t border-white/5 pt-1 sm:mt-1.5 sm:pt-1.5">
-                <PlayerHand
-                  cards={view.self.hand}
-                  selectable={isMyTurn && !pendingMatch && Boolean(onPlayCard)}
-                  onPlay={onPlayCard}
+              {/* ── Player zone ── */}
+              <section className="game-zone game-zone-player">
+                <CapturedStrip
+                  rulePreset={view.rulePreset}
+                  seat={view.self.seat}
+                  captured={view.self.captured}
+                  goCount={view.self.goCount}
+                  hasShaken={view.self.hasShaken}
                 />
-              </div>
-            </section>
+
+                <div className="mt-1 border-t border-white/5 pt-1 sm:mt-1.5 sm:pt-1.5">
+                  <PlayerHand
+                    cards={view.self.hand}
+                    selectable={isMyTurn && !pendingMatch && Boolean(handlePlayCard)}
+                    onPlay={handlePlayCard}
+                    playingCardId={playingCardId}
+                  />
+                </div>
+              </section>
+            </LayoutGroup>
           </div>
         </div>
       </div>
